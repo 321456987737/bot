@@ -380,7 +380,6 @@
 
 
 
-
 import { Client, GatewayIntentBits } from "discord.js";
 import dotenv from "dotenv";
 
@@ -403,12 +402,18 @@ const client = new Client({
   ],
 });
 
+// === POST data to Next.js ===
 async function postToNext(payload) {
-  if (!NEXT_API_URL || !POST_SECRET) return;
+  console.log("=== postToNext called ===");
+  console.log("Payload:", JSON.stringify(payload, null, 2));
+  if (!NEXT_API_URL || !POST_SECRET) {
+    console.warn("NEXT_API_URL or POST_SECRET not set, skipping POST");
+    return;
+  }
+
   try {
-    console.log(NEXT_API_URL)
-    console.log("Posting to Next API...");
-   const res = await fetch(`${NEXT_API_URL}/api/discord`, {
+    console.log("Posting to Next API at:", `${NEXT_API_URL}/api/discord`);
+    const res = await fetch(`${NEXT_API_URL}/api/discord`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -418,19 +423,22 @@ async function postToNext(payload) {
     });
     console.log("🟢 [bot] Response from Next.js:", res.status, res.statusText);
   } catch (err) {
-    console.error("Failed to POST to Next.js:", err.message || err);
+    console.error("❌ Failed to POST to Next.js:", err.message || err);
   }
 }
 
+// === Process Discord message ===
 const processMessage = (m) => {
+  console.log("=== processMessage called ===");
+  console.log("Raw message:", m);
+
   let stockData = m.content || "";
 
   if (m.embeds?.length) {
     stockData = m.embeds
       .map((e) => {
         let desc = e.description ?? "";
-        if (e.fields?.length)
-          desc += "\n" + e.fields.map((f) => `${f.name}: ${f.value}`).join("\n");
+        if (e.fields?.length) desc += "\n" + e.fields.map((f) => `${f.name}: ${f.value}`).join("\n");
         if (e.title) desc = `${e.title}\n${desc}`;
         return desc;
       })
@@ -440,40 +448,62 @@ const processMessage = (m) => {
   stockData = stockData
     .replace(
       /<:([a-zA-Z0-9_]+):(\d+)>/g,
-      (_, name, id) =>
-        `<img src="https://cdn.discordapp.com/emojis/${id}.png" alt="${name}" style="width:20px;height:20px;vertical-align:middle;" />`
+      (_, name, id) => `<img src="https://cdn.discordapp.com/emojis/${id}.png" alt="${name}" style="width:20px;height:20px;vertical-align:middle;" />`
     )
     .replace(/<t:(\d+):R>/g, (_, ts) => new Date(ts * 1000).toLocaleTimeString())
     .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
 
-  return {
+  const processed = {
     id: m.id,
     author: m.author?.username || "Unknown",
     content: stockData,
     createdAt: m.createdTimestamp,
   };
+
+  console.log("Processed message:", processed);
+  return processed;
 };
 
-// ✅ Corrected event name
-client.once("clientReady", async () => {
-  console.log(`🤖 Logged in as ${client.user.tag}`);
-  if (!CHANNEL_ID) return console.warn("CHANNEL_ID not set.");
+// === On bot ready ===
+client.once("ready", async () => {
+  console.log("🤖 Logged in as", client.user.tag);
+  if (!CHANNEL_ID) {
+    console.warn("CHANNEL_ID not set — cannot fetch initial messages");
+    return;
+  }
 
   try {
+    console.log("Fetching channel:", CHANNEL_ID);
     const channel = await client.channels.fetch(CHANNEL_ID);
+    console.log("Channel fetched:", channel.name);
+
     const messages = await channel.messages.fetch({ limit: 2 });
-    for (const msg of messages.map(processMessage)) await postToNext(msg);
+    console.log("Fetched messages:", messages.map((m) => m.content));
+
+    const processedMessages = messages.map(processMessage);
+    for (const msg of processedMessages) {
+      console.log("Sending initial message to Next.js API:", msg);
+      await postToNext(msg);
+    }
   } catch (err) {
-    console.error("❌ Error fetching messages:", err);
+    console.error("❌ Error fetching initial messages:", err);
   }
 });
 
+// === On new message ===
 client.on("messageCreate", async (message) => {
-  console.log("💬 [bot] messageCreate triggered");
-  if (message.author?.bot) return;
-  if (CHANNEL_ID && message.channel?.id !== CHANNEL_ID) return;
+  console.log("💬 [bot] messageCreate triggered for message:", message.content);
+  if (message.author?.bot) {
+    console.log("Skipping bot message");
+    return;
+  }
+  if (CHANNEL_ID && message.channel?.id !== CHANNEL_ID) {
+    console.log("Skipping message from other channel:", message.channel?.id);
+    return;
+  }
+
   const processed = processMessage(message);
-  console.log("📨 [bot] Processed message:", processed);
+  console.log("Sending new message to Next.js API:", processed);
   await postToNext(processed);
 });
 
