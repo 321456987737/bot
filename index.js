@@ -406,6 +406,7 @@ const client = new Client({
 async function postToNext(payload) {
   if (!NEXT_API_URL || !POST_SECRET) return;
   try {
+    console.log(NEXT_API_URL)
     console.log("Posting to Next API...");
     await fetch(`${NEXT_API_URL}/api/discord`, {
       method: "POST",
@@ -415,6 +416,7 @@ async function postToNext(payload) {
       },
       body: JSON.stringify(payload),
     });
+    console.log("done uploading")
   } catch (err) {
     console.error("Failed to POST to Next.js:", err.message || err);
   }
@@ -453,7 +455,7 @@ const processMessage = (m) => {
 };
 
 // ✅ Corrected event name
-client.once("ready", async () => {
+client.once("clientReady", async () => {
   console.log(`🤖 Logged in as ${client.user.tag}`);
   if (!CHANNEL_ID) return console.warn("CHANNEL_ID not set.");
 
