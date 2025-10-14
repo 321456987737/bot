@@ -408,7 +408,7 @@ async function postToNext(payload) {
   try {
     console.log(NEXT_API_URL)
     console.log("Posting to Next API...");
-    await fetch(`${NEXT_API_URL}/api/discord`, {
+   const res = await fetch(`${NEXT_API_URL}/api/discord`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -416,7 +416,7 @@ async function postToNext(payload) {
       },
       body: JSON.stringify(payload),
     });
-    console.log("done uploading")
+    console.log("🟢 [bot] Response from Next.js:", res.status, res.statusText);
   } catch (err) {
     console.error("Failed to POST to Next.js:", err.message || err);
   }
@@ -469,9 +469,11 @@ client.once("clientReady", async () => {
 });
 
 client.on("messageCreate", async (message) => {
+  console.log("💬 [bot] messageCreate triggered");
   if (message.author?.bot) return;
   if (CHANNEL_ID && message.channel?.id !== CHANNEL_ID) return;
   const processed = processMessage(message);
+  console.log("📨 [bot] Processed message:", processed);
   await postToNext(processed);
 });
 
