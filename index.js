@@ -1,4 +1,3 @@
-
 import { Client, GatewayIntentBits } from "discord.js";
 import dotenv from "dotenv";
 
@@ -18,13 +17,13 @@ const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent, // Needed for reading message content
+    GatewayIntentBits.MessageContent,
   ],
 });
 
-// === Helper: POST to Next.js API ===
+// === POST to Next.js API ===
 async function postToNext(payload) {
-  console.log("=== postToNext called ===");
+  console.log("=== POST to Next.js API ===");
   console.log("Payload:", JSON.stringify(payload, null, 2));
 
   if (!NEXT_API_URL || !POST_SECRET) {
@@ -33,7 +32,6 @@ async function postToNext(payload) {
   }
 
   try {
-    console.log("Posting to Next API at:", `${NEXT_API_URL}/api/discord`);
     const res = await fetch(`${NEXT_API_URL}/api/discord`, {
       method: "POST",
       headers: {
@@ -48,14 +46,10 @@ async function postToNext(payload) {
   }
 }
 
-// === Helper: process message ===
+// === Process Discord message ===
 function processMessage(m) {
-  console.log("=== processMessage called ===");
-  console.log("Raw message:", m);
-
   let stockData = m.content || "";
 
-  // Process embeds
   if (m.embeds?.length) {
     stockData = m.embeds
       .map((e) => {
@@ -69,7 +63,6 @@ function processMessage(m) {
       .join("\n");
   }
 
-  // Convert emojis and timestamps
   stockData = stockData
     .replace(
       /<:([a-zA-Z0-9_]+):(\d+)>/g,
@@ -79,23 +72,20 @@ function processMessage(m) {
     .replace(/<t:(\d+):R>/g, (_, ts) => new Date(ts * 1000).toLocaleTimeString())
     .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
 
-  const processed = {
+  return {
     id: m.id,
     author: m.author?.username || "Unknown",
     content: stockData,
     createdAt: m.createdTimestamp,
   };
-
-  console.log("Processed message:", processed);
-  return processed;
 }
 
-// === Bot ready ===
+// === On bot ready ===
 client.once("ready", async () => {
   console.log(`🤖 Logged in as ${client.user.tag}`);
 
   if (!CHANNEL_ID) {
-    console.warn("CHANNEL_ID not set. Cannot fetch initial messages.");
+    console.warn("CHANNEL_ID not set. Exiting.");
     return;
   }
 
@@ -104,25 +94,26 @@ client.once("ready", async () => {
     console.log("Channel fetched:", channel.name);
 
     const messages = await channel.messages.fetch({ limit: 2 });
-    console.log("Fetched last messages:", messages.map((m) => m.content));
+    console.log("Fetched latest 2 messages:");
+    messages.forEach((m) => console.log(`[${m.createdTimestamp}] ${m.author.username}: ${m.content}`));
 
     for (const msg of messages.map(processMessage)) {
-      console.log("Sending initial message to Next.js API:", msg);
+      console.log("Sending message to Next.js API:", msg);
       await postToNext(msg);
     }
   } catch (err) {
-    console.error("❌ Error fetching initial messages:", err);
+    console.error("❌ Error fetching messages:", err);
   }
 });
 
 // === On new message ===
 client.on("messageCreate", async (message) => {
-  console.log("💬 [bot] messageCreate triggered");
+  console.log("💬 New message received");
   console.log("Channel ID:", message.channel.id, "Expected:", CHANNEL_ID);
   console.log("Author:", message.author?.username, "Bot?", message.author?.bot);
   console.log("Content:", message.content);
 
-  // if (message.author?.bot) return;
+  if (message.author?.bot) return;
   if (CHANNEL_ID && message.channel?.id !== CHANNEL_ID) return;
 
   const processed = processMessage(message);
@@ -136,7 +127,6 @@ client.login(process.env.DISCORD_TOKEN).catch((err) => {
   console.error("❌ Failed to login:", err);
   process.exit(1);
 });
-
 
 
 
