@@ -122,7 +122,7 @@ client.on("messageCreate", async (message) => {
   console.log("Author:", message.author?.username, "Bot?", message.author?.bot);
   console.log("Content:", message.content);
 
-  if (message.author?.bot) return;
+  // if (message.author?.bot) return;
   if (CHANNEL_ID && message.channel?.id !== CHANNEL_ID) return;
 
   const processed = processMessage(message);
