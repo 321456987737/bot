@@ -112,10 +112,10 @@ client.on("messageCreate", async (message) => {
     console.log(`💬 messageCreate event: author=${message.author?.username || "?"} id=${message.id} channel=${message.channel?.id}`);
 
     // ignore other bots unless debugging
-    if (!ALLOW_BOT_MESSAGES_FOR_DEBUG) {
-      console.log("⛔ Ignoring message from bot:", message.author?.username);
-      return;
-    }
+    // if (!ALLOW_BOT_MESSAGES_FOR_DEBUG) {
+    //   console.log("⛔ Ignoring message from bot:", message.author?.username);
+    //   return;
+    // }
 
     // If you're limiting to a single channel, ensure env var is correct
     if (CHANNEL_ID && message.channel?.id !== CHANNEL_ID) {
