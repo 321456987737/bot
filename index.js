@@ -1,4 +1,4 @@
-// bot/index.js
+// bot/index.js (improved debug-friendly)
 import { Client, GatewayIntentBits } from "discord.js";
 import dotenv from "dotenv";
 
@@ -21,6 +21,7 @@ const client = new Client({
   ],
 });
 
+// Helper to process message into payload
 function processMessage(m) {
   let stockData = m.content ?? "";
 
@@ -54,6 +55,7 @@ function processMessage(m) {
   };
 }
 
+// POST and print response body for debug
 async function postToNextBatch(messagesArray) {
   if (!NEXT_API_URL || !POST_SECRET) {
     console.warn("NEXT_API_URL or POST_SECRET not set. Skipping POST.");
@@ -69,7 +71,10 @@ async function postToNextBatch(messagesArray) {
       },
       body: JSON.stringify({ messages: messagesArray }),
     });
+
+    const text = await res.text().catch(() => "<no body>");
     console.log("🟢 POST to Next.js:", res.status, res.statusText);
+    console.log("↳ Response body:", text);
   } catch (err) {
     console.error("❌ Failed to POST to Next.js:", err);
   }
@@ -87,7 +92,6 @@ client.once("ready", async () => {
     const channel = await client.channels.fetch(CHANNEL_ID);
     console.log("Channel fetched:", channel?.name || "(unknown)");
 
-    // Fetch latest 2 messages (newest -> oldest), then reverse to oldest -> newest
     const messagesCol = await channel.messages.fetch({ limit: 2 });
     const msgs = Array.from(messagesCol.values()).reverse().map(processMessage);
 
@@ -100,32 +104,48 @@ client.once("ready", async () => {
   }
 });
 
-client.on("messageCreate", async (message) => {
-  // Prevent the bot from processing other bots (avoid loops)
-  if (message.author?.bot) return;
-  if (CHANNEL_ID && message.channel?.id !== CHANNEL_ID) return;
+// DEBUG: set to true to allow reposting bot messages for testing (only for debug)
+const ALLOW_BOT_MESSAGES_FOR_DEBUG = false;
 
+client.on("messageCreate", async (message) => {
   try {
+    console.log(`💬 messageCreate event: author=${message.author?.username || "?"} id=${message.id} channel=${message.channel?.id}`);
+
+    // ignore other bots unless debugging
+    if (!ALLOW_BOT_MESSAGES_FOR_DEBUG && message.author?.bot) {
+      console.log("⛔ Ignoring message from bot:", message.author?.username);
+      return;
+    }
+
+    // If you're limiting to a single channel, ensure env var is correct
+    if (CHANNEL_ID && message.channel?.id !== CHANNEL_ID) {
+      console.log(`⛔ Message in channel ${message.channel?.id} ignored (looking for ${CHANNEL_ID})`);
+      return;
+    }
+
     // Fetch latest 2 messages each time a new message arrives
     const messagesCol = await message.channel.messages.fetch({ limit: 2 });
-    // convert to array oldest -> newest
     const msgs = Array.from(messagesCol.values()).reverse().map(processMessage);
 
-    if (msgs.length > 0) {
-      console.log("Posting batch (prev + current) to Next.js:", msgs);
-      await postToNextBatch(msgs); // single POST containing both messages
-    }
+    console.log("Posting batch (prev + current) to Next.js:", msgs);
+    await postToNextBatch(msgs);
   } catch (err) {
-    console.error("❌ Error fetching or posting messages:", err);
+    console.error("❌ Error in messageCreate handler:", err);
   }
 });
+
+// Useful runtime/log listeners
+client.on("error", (err) => console.error("Discord client error:", err));
+client.on("warn", (info) => console.warn("Discord client warning:", info));
+client.on("shardError", (err) => console.error("Shard error:", err));
+client.on("disconnect", (event) => console.warn("Disconnected:", event));
+client.on("reconnecting", () => console.log("Reconnecting..."));
 
 console.log("Attempting to log in Discord bot...");
 client.login(process.env.DISCORD_TOKEN).catch((err) => {
   console.error("❌ Failed to login:", err);
-  process.exit(1);
+  // don't exit — allow external process manager to restart if needed
 });
-
 
 //  import { Client, GatewayIntentBits } from "discord.js";
 // import dotenv from "dotenv";
