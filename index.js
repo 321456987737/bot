@@ -135,10 +135,10 @@ client.on("messageCreate", async (message) => {
     if (!id) return;
 
     // ignore other bots (prevent loop)
-    if (message.author?.bot) {
-      // console.log("Ignoring bot message:", message.author?.username);
-      return;
-    }
+    // if (message.author?.bot) {
+    //   // console.log("Ignoring bot message:", message.author?.username);
+    //   return;
+    // }
 
     // Map env channels to tags
     const mapping = {
