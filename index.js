@@ -81,6 +81,7 @@ async function postToNextBatch(channelTag, messagesArray) {
       headers: {
         "Content-Type": "application/json",
         "x-bot-secret": POST_SECRET,
+        "Origin":"https://bot-1-8at8.onrender.com"
       },
       body: JSON.stringify({ channel: channelTag, messages: messagesArray }),
     });
